@@ -8,8 +8,8 @@
 python3 -i main.py
 ```
 
-You may see various deprecation warnings depending on your environment,
-but you should be able to safely ignore them.
+You may see some deprecation warnings depending on your environment,
+but you should be able to continue without issue. 
 
 ## Description of the data
 
