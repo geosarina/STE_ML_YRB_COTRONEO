@@ -132,7 +132,7 @@ We also focus exclusively on the median-performing random forest model, since,
 according to the results displayed in `all_models_mae.png`, the RF performs
 considerably better than other model types tested in this study.
 
-Model evaluation, feature importance, and partial dependence plots are then generated
+Model evaluation, feature importance, and partial dependence plots are therefore generated
 for the median-performing RF model.
 
 Finally, the MAE and R^2 values obtained for the median RF model are printed
