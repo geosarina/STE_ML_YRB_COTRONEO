@@ -1,4 +1,4 @@
-# Applying Machine Learning to Understand Yukon Basin Weathering Processes
+# Applying Machine Learning to investigate metal isotope variations at the watershed scale: A case study with lithium isotopes across the Yukon River Basin
 
 ## How to run the code
 
