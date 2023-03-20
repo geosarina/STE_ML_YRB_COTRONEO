@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.random import RandomState
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -23,10 +24,10 @@ def separate_inputs_and_labels(data):
     X = data.drop(['d7Li'], axis=1)
     return X, y
 
-def train_model(model, data, seed, scale=True):
+def train_model(model, data, random_state, scale=True):
 
     X, y = separate_inputs_and_labels(data)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=seed)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=random_state)
 
     if scale:
         scaler = StandardScaler()
@@ -43,20 +44,24 @@ def train_model(model, data, seed, scale=True):
 
 def evaluate_model(model, X, X_train, X_test, y_test, seed):
     eval_params = {}
-
+    #add scoring='neg_mean_absolute_error' to arguments below if desired
     importances = permutation_importance(model, X_test, y_test, n_repeats=30, random_state=seed).importances_mean
 
     y_pred = model.predict(X_test)
 
-    r_square = r2_score(y_test, y_pred)
+    r_squared = r2_score(y_test, y_pred)
     mae = mean_absolute_error(y_test, y_pred)
-    mae_mean = mean_absolute_error(y_test, np.repeat(np.mean(y_test), len(y_test)))
+
+    mean_preds = np.repeat(np.mean(y_test), len(y_test))
+    mae_mean = mean_absolute_error(y_test, mean_preds)
+    r_squared_mean = r2_score(y_test, mean_preds)
     residuals = y_test - y_pred
 
     indices = np.argsort(importances)
 
-    eval_params['r_square'] = r_square
+    eval_params['r_squared'] = r_squared
     eval_params['mae'] = mae
+    eval_params['r_squared_mean'] = r_squared_mean
     eval_params['mae_mean'] = mae_mean
     eval_params['importance_vals'] = importances[indices]
     eval_params['importance_names'] = X.columns[indices]
@@ -68,11 +73,15 @@ def evaluate_model(model, X, X_train, X_test, y_test, seed):
 
     return eval_params
 
-def iterated_evaluation(model, data, model_name, num_iterations=10):
+def iterated_evaluation(model, data, model_name, seed, num_iterations=10):
+    prng = RandomState(seed)
+    random_state = prng.randint(0, 9999999, size=num_iterations)
+
     all_evals = {
-    'r_square': [],
+    'r_squared': [],
     'mae': [],
     'mae_mean': [],
+    'r_squared_mean': [],
     'importance_vals': [],
     'importance_names': [],
     'residuals': [],
@@ -87,12 +96,13 @@ def iterated_evaluation(model, data, model_name, num_iterations=10):
     if model_name == 'model2':
         scale = False
 
-    for seed in np.arange(num_iterations):
-        trained_model, X, X_train, X_test, y_test = train_model(model, data, seed, scale=True)
+    for seed in random_state:
+        trained_model, X, X_train, X_test, y_test = train_model(model, data, seed, scale=scale)#here scale=True
         eval_params = evaluate_model(trained_model, X, X_train, X_test, y_test, seed)
 
-        all_evals['r_square'].append(eval_params['r_square'])
+        all_evals['r_squared'].append(eval_params['r_squared'])
         all_evals['mae'].append(eval_params['mae'])
+        all_evals['r_squared_mean'].append(eval_params['r_squared_mean'])
         all_evals['mae_mean'].append(eval_params['mae_mean'])
         all_evals['importance_vals'].append(eval_params['importance_vals'])
         all_evals['importance_names'].append(eval_params['importance_names'])
@@ -104,19 +114,24 @@ def iterated_evaluation(model, data, model_name, num_iterations=10):
 
     return all_evals
 
-def save_plots_for_all_models(model_evaluations, path):
+def save_plots_for_all_models(model_evaluations, path, res, metric='mae'):
     fig = plt.figure(figsize=(12,4))
     ax = fig.add_axes([0,0,1,1])
+
+    mean_metric = 'mae_mean'
+
+    if metric == 'r_squared':
+        mean_metric = 'r_squared_mean'
 
     #Note: the order in which these models are plotted came from trial and
     #error. In our case, it happens to be the case that model 2 (RF) performs best,
     #and model 1 performs worst.
     sns.violinplot(data=[
-    model_evaluations['model1']['mae_mean'],
-    model_evaluations['model1']['mae'],
-    model_evaluations['model4']['mae'],
-    model_evaluations['model3']['mae'],
-    model_evaluations['model2']['mae']],
+    model_evaluations['model1'][mean_metric],
+    model_evaluations['model1'][metric],
+    model_evaluations['model4'][metric],
+    model_evaluations['model3'][metric],
+    model_evaluations['model2'][metric]],
     palette=['r','b', 'm', 'y', 'g'],
     saturation=0.5
     )
@@ -125,14 +140,14 @@ def save_plots_for_all_models(model_evaluations, path):
 
     plt.xticks(np.arange(5), ['mean', 'lin reg', 'knn', 'svm', 'rf'])
     plt.xticks(rotation=90)
-    plt.title('Model comparisons - MAE')
-    plt.savefig(path, dpi=150)
+    plt.title('Model comparisons - ' + metric)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
-def test_all_models(models_to_test, data):
+def test_all_models(models_to_test, data, random_state):
     model_evaluations = {}
     for model in models_to_test:
-        model_evaluations[model] = iterated_evaluation(models_to_test[model], data, model, num_iterations=30)
+        model_evaluations[model] = iterated_evaluation(models_to_test[model], data, model, random_state, num_iterations=30)
         print('Completed evaluation for ' + model)
 
     return model_evaluations
@@ -145,7 +160,7 @@ def locate_median_model(model_evaluations):
 def retrieve_evals_for_model_at_index(model_evaluations, index):
     median_evaluations = {}
 
-    median_evaluations['r_square'] = model_evaluations['r_square'][index]
+    median_evaluations['r_squared'] = model_evaluations['r_squared'][index]
     median_evaluations['mae'] = model_evaluations['mae'][index]
     median_evaluations['mae_mean'] = model_evaluations['mae_mean'][index]
     median_evaluations['importance_vals'] = model_evaluations['importance_vals'][index]
@@ -163,37 +178,37 @@ def retrieve_median_model_evals(model_evaluations):
     median_model_evaluations = retrieve_evals_for_model_at_index(model_evaluations, median_model_index)
     return median_model_evaluations
 
-def save_y_test_histogram(y_test, path):
+def save_y_test_histogram(y_test, path, res):
     y_test.hist()
     plt.title('y_test histogram')
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
-def save_residuals_histogram(residuals, path):
+def save_residuals_histogram(residuals, path, res):
     residuals.hist()
     plt.title('residuals')
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
-def save_y_pred_vs_y_test(y_pred, y_test, path):
+def save_y_pred_vs_y_test(y_pred, y_test, path, res):
     fig = plt.figure(figsize=(8,6))
     plt.scatter(y_test, y_pred)
     plt.title('y_pred vs y_test')
     plt.xlabel('y_test')
     plt.ylabel('y_pred')
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
-def save_residuals_vs_y_test(residuals, y_test, path):
+def save_residuals_vs_y_test(residuals, y_test, path, res):
     fig = plt.figure(figsize=(8,6))
     plt.scatter(y_test, residuals)
     plt.title('residuals vs y_test')
     plt.xlabel('y_test')
     plt.ylabel('residuals')
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
-def save_feature_importance_plots(importance_names, importance_vals, path):
+def save_feature_importance_plots(importance_names, importance_vals, path, res):
     plt.figure(figsize=(12,4))
     plt.title("Feature importances")
     plt.bar(range(len(importance_names)), importance_vals,
@@ -201,14 +216,14 @@ def save_feature_importance_plots(importance_names, importance_vals, path):
     plt.xticks(range(len(importance_names)), importance_names)
     plt.xlim([-1, len(importance_names)])
     plt.xticks(rotation=90)
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
-def save_partial_dependence_plot(model, X_train, columns, path):
+def save_partial_dependence_plot(model, X_train, columns, path, res):
     pdp_plots = plot_partial_dependence(model, X_train, columns,
         kind="average", random_state=0)
     pdp_plots.figure_.suptitle('Partial dependence of Li isotope ratio on most important features')
     pdp_plots.figure_.subplots_adjust(hspace=0.3)
     pdp_plots.figure_.set_size_inches((16,12))
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()

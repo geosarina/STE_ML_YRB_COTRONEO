@@ -21,7 +21,7 @@ def generate_correlation_matrix(data):
     corr_matrix = data.corr()**2
     return corr_matrix
 
-def save_correlation_matrix(matrix, path):
+def save_correlation_matrix(matrix, path, res):
 
     sns.set_style(style = 'white')
     f, ax = plt.subplots(figsize=(11, 9))
@@ -34,28 +34,28 @@ def save_correlation_matrix(matrix, path):
         cbar_kws={"shrink": .5},
         ax=ax)
 
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
-def save_correlations_with_d7Li(correlation_matrix, path):
+def save_correlations_with_d7Li(correlation_matrix, path, res):
 
     plt.figure(figsize=(12,4))
     correlation_matrix['d7Li'].plot.bar(color='Blue')
     plt.title('Squared Pearson correlations with d7Li')
 
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
-def save_scatter_matrix(data, path):
+def save_scatter_matrix(data, path, res):
     pd.plotting.scatter_matrix(data, alpha=0.8, figsize=(20,20))
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
-def save_partial_scatter_matrix(data, columns, path):
+def save_partial_scatter_matrix(data, columns, path, res):
     colors = []
     colors = ['blue' for sample in np.arange(len(data))]
     pd.plotting.scatter_matrix(data[columns], alpha=0.8, figsize=(10,10), color=colors, s=500)
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
 def remove_Li(data):
@@ -76,7 +76,7 @@ def run_pca(data, n_components):
 
     return pca_data, explained_variance_ratios, pca
 
-def save_pca_component_contributions(pca, data, component, path):
+def save_pca_component_contributions(pca, data, component, path, res):
     feature_contributions = np.abs(pca.components_[component])
     sorted_indices = np.argsort(feature_contributions)
     feature_names = list(data.columns[sorted_indices])
@@ -90,26 +90,26 @@ def save_pca_component_contributions(pca, data, component, path):
     ax.bar(feature_names, contributions)
     plt.xticks(rotation=90)
     plt.title('Principal component ' + str(component + 1))
-    plt.savefig(path + str(component + 1), dpi=150)
+    plt.savefig(path + str(component + 1), dpi=res)
 
     plt.gcf().subplots_adjust(bottom=0.8)
 
     plt.clf()
 
-def save_all_pca_component_contributions(pca, data, n_components, path):
+def save_all_pca_component_contributions(pca, data, n_components, path, res):
     for component in np.arange(n_components):
-        save_pca_component_contributions(pca, data, component, path)
+        save_pca_component_contributions(pca, data, component, path, res)
 
-def save_explained_variance_ratios(explained_variance_ratios, path):
+def save_explained_variance_ratios(explained_variance_ratios, path, res):
     fig, ax = plt.subplots(figsize=(12,4))
 
     labels = np.arange(len(explained_variance_ratios))
 
     ax.bar(labels, explained_variance_ratios)
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
-def save_cumulative_variance(explained_variance_ratios, path):
+def save_cumulative_variance(explained_variance_ratios, path, res):
     cumulative_variance = np.cumsum(explained_variance_ratios)
     labels = np.arange(len(explained_variance_ratios))
 
@@ -117,7 +117,7 @@ def save_cumulative_variance(explained_variance_ratios, path):
 
     ax.bar(labels, explained_variance_ratios)
     plt.plot(cumulative_variance)
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
 def generate_2_component_pca_df(data):
@@ -129,6 +129,7 @@ def re_append_Li_and_ID(data_no_Li_no_ID, data):
 
 def save_annotated_plot(data, path,
     title, x_label, y_label,
+    res,
     annotate=True,
     font_size=16):
 
@@ -164,13 +165,13 @@ def save_annotated_plot(data, path,
     plt.xticks(fontsize=font_size)
     plt.yticks(fontsize=font_size)
     ax.grid()
-    plt.savefig(path, dpi=150)
+    plt.savefig(path, dpi=res)
     plt.clf()
 
-def run_2d_tsne(data):
+def run_2d_tsne(data, random_state):
 
     #Note: the perplexity value below is a parameter that needs to be
     #modified for each new dataset.
-    tsne = TSNE(n_components=2, perplexity=5)
+    tsne = TSNE(n_components=2, perplexity=5, random_state=random_state)
     tsne_data_2d = tsne.fit_transform(data)
     return pd.DataFrame(tsne_data_2d, columns=['PC1', 'PC2'])
